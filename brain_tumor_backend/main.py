@@ -22,7 +22,7 @@ def get_class_names() -> List[str]:
         return json.load(f)
 
 # EXACT Colab transforms
-from .transforms import IM_TRANSFORM
+from brain_tumor_backend.transforms import IM_TRANSFORM
 
 app = FastAPI(title="Neuro Scan Assist API", version="1.0")
 
