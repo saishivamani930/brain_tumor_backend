@@ -1,0 +1,19 @@
+﻿# Bytecode cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual envs
+.venv/
+env/
+venv/
+
+# OS files
+.DS_Store
+
+# Logs
+*.log
+
+# Large model files (optional, keep code tracked)
+*.pth
+*.pt
