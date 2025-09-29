@@ -58,6 +58,7 @@ _model = None
 
 STATE_PATH_NEW = BASE_DIR / "model_state_dict.pth"  # Colab-correct weights
 STATE_PATH_OLD = BASE_DIR / "model.pth"             # fallback
+WEIGHTS_USED: str | None = None                     # <— track which file loaded
 
 def _load_any_state_into(model: nn.Module, path: Path):
     obj = torch.load(path, map_location="cpu")
@@ -68,14 +69,16 @@ def _load_any_state_into(model: nn.Module, path: Path):
         model.load_state_dict(obj.state_dict(), strict=True)
 
 def get_model():
-    global _model
+    global _model, WEIGHTS_USED
     if _model is None:
         class_names = get_class_names()
         m = HybridCNNTransformer(num_classes=len(class_names))
         if STATE_PATH_NEW.exists():
             _load_any_state_into(m, STATE_PATH_NEW)
+            WEIGHTS_USED = "model_state_dict.pth"
         elif STATE_PATH_OLD.exists():
             _load_any_state_into(m, STATE_PATH_OLD)
+            WEIGHTS_USED = "model.pth"
         else:
             raise FileNotFoundError("No weights found: model_state_dict.pth or model.pth")
         m.to(device).eval()
@@ -112,7 +115,7 @@ async def predict(image: UploadFile = File(...)):
 
     return PredictResponse(pred_class=class_names[pred_idx], probs=probs)
 
-# Debug (optional; remove later)
+# --- Debug (remove later) ---
 @app.get("/debug/labels")
 def debug_labels():
     cn = get_class_names()
@@ -126,3 +129,25 @@ def debug_checksum():
             return hashlib.sha256(f.read()).hexdigest()
     files = ["labels.json", "transforms.py", "model_state_dict.pth", "model.pth"]
     return {f: (sha256(BASE_DIR / f) if (BASE_DIR / f).exists() else "missing") for f in files}
+
+@app.get("/debug/which-weights")
+def which_weights():
+    # Verify whether Render actually loaded the Colab weights
+    return {"weights": WEIGHTS_USED}
+
+@app.post("/debug/predict")
+async def debug_predict(image: UploadFile = File(...)):
+    # Returns top-k to compare with Colab numerically
+    raw = await image.read()
+    x = preprocess(raw)
+    with torch.no_grad():
+        logits = get_model()(x)
+        probs_t = F.softmax(logits, dim=1)[0].cpu()
+    class_names = get_class_names()
+    top_p, top_i = torch.topk(probs_t, k=len(class_names))
+    topk = [(class_names[int(i)], float(p)) for p, i in zip(top_p, top_i)]
+    return {"topk": topk}
+if __name__ == "__main__":
+    import uvicorn, os
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("brain_tumor_backend.main:app", host="0.0.0.0", port=port, reload=False)
