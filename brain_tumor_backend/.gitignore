@@ -1,0 +1,19 @@
+﻿# Bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual envs
+.venv/
+env/
+venv/
+
+# OS files
+.DS_Store
+
+# Model files (large)
+*.pth
+*.pt
+
+# Logs
+*.log
